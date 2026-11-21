@@ -14,13 +14,20 @@ class IrTransmitter(context: Context) {
     val isAvailable: Boolean
         get() = try { ir?.hasIrEmitter() == true } catch (e: Exception) { false }
 
+    /** Rangos de frecuencia que admite el emisor, p. ej. "30–60 kHz". */
+    val frequencyRanges: String
+        get() = try {
+            ir?.carrierFrequencies?.joinToString(", ") { "${it.minFrequency / 1000}–${it.maxFrequency / 1000} kHz" }
+                ?.ifEmpty { null } ?: "desconocido"
+        } catch (e: Exception) { "desconocido" }
+
     /**
      * Envía la señal. Es una llamada bloqueante (dura lo que dura la señal),
      * así que hay que llamarla fuera del hilo principal.
      */
     fun transmit(signal: IrSignal): Boolean {
         val manager = ir ?: return false
-        if (!isAvailable) return false
+        if (!isAvailable || signal.pattern.isEmpty()) return false
         return try {
             manager.transmit(signal.frequency, signal.pattern)
             true

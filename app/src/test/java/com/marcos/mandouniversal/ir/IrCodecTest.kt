@@ -1,53 +1,69 @@
 package com.marcos.mandouniversal.ir
 
-import com.marcos.mandouniversal.data.Brands
+import com.marcos.mandouniversal.data.CodeDatabase
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import kotlin.math.abs
 
 class IrCodecTest {
 
-    @Test
-    fun necTieneCabeceraY32Bits() {
-        val s = IrCodec.encode(IrCommand(Protocol.NEC1, 4, -1, 8)) // LG power
-        assertEquals(38000, s.frequency)
-        assertEquals(9000, s.pattern[0])
-        assertEquals(4500, s.pattern[1])
-        assertEquals(2 + 32 * 2 + 1, s.pattern.size)
+    /** Normaliza tiempos con signo (negativo = silencio): une tramos iguales y quita silencios de los extremos. */
+    private fun normalize(t: List<Int>): List<Int> {
+        val out = ArrayList<Int>()
+        for (v in t) {
+            if (out.isEmpty() && v < 0) continue
+            if (out.isNotEmpty() && (out.last() < 0) == (v < 0)) out[out.lastIndex] = out.last() + v else out += v
+        }
+        while (out.isNotEmpty() && out.last() < 0) out.removeAt(out.lastIndex)
+        return out
     }
 
-    @Test
-    fun samsungUsaCabecera4500() {
-        val s = IrCodec.encode(IrCommand(Protocol.NECX2, 7, 7, 2))
-        assertEquals(4500, s.pattern[0])
-        assertEquals(4500, s.pattern[1])
-    }
+    private fun signed(pattern: IntArray) = pattern.mapIndexed { i, v -> if (i % 2 == 0) v else -v }
 
+    /**
+     * Compara con las señales que genera el propio firmware de Flipper Zero
+     * (compilado aparte y guardado en flipper_reference.jsonl).
+     */
     @Test
-    fun sonyVaA40kHzYRepiteTresVeces() {
-        val s = IrCodec.encode(IrCommand(Protocol.SONY12, 1, -1, 21))
-        assertEquals(40000, s.frequency)
-        assertEquals(3, s.pattern.count { it == 2400 })
-    }
-
-    @Test
-    fun rc6EmpiezaConCabeceraLarga() {
-        val s = IrCodec.encode(IrCommand(Protocol.RC6, 0, -1, 0x0C), toggle = true)
-        assertEquals(36000, s.frequency)
-        assertEquals(2664, s.pattern[0])
-    }
-
-    @Test
-    fun todosLosCodigosGeneranPatronesValidos() {
-        for (brand in Brands.all) for (set in brand.codeSets) {
-            val cmds = set.codes.values + set.extras.map { it.command }
-            for (cmd in cmds) {
-                val p = IrCodec.encode(cmd).pattern
-                assertTrue("$cmd vacío", p.isNotEmpty())
-                assertTrue("$cmd debe acabar encendido", p.size % 2 == 1)
-                assertTrue("$cmd duración > 2 s", p.sum() < 2_000_000)
-                assertTrue("$cmd tiene tramos <= 0", p.all { it > 0 })
+    fun coincideConFlipper() {
+        val lines = javaClass.classLoader!!.getResource("flipper_reference.jsonl")!!.readText().lines().filter { it.isNotBlank() }
+        assertTrue(lines.size >= 15)
+        for (line in lines) {
+            val o = JSONObject(line)
+            val proto = o.getString("p")
+            val arr = o.getJSONArray("t")
+            val expected = normalize(List(arr.length()) { arr.getInt(it) })
+            // Flipper empieza con el toggle a 0 en RC5/RC6
+            val actual = normalize(signed(IrCodec.encode(proto, o.getLong("a"), o.getLong("c"), toggle = false).pattern))
+            assertEquals("$proto ${o.getLong("a")}/${o.getLong("c")}: número de tramos", expected.size, actual.size)
+            expected.zip(actual).forEachIndexed { i, (e, a) ->
+                assertTrue("$proto tramo $i: esperado $e, obtenido $a", abs(e - a) <= maxOf(3, abs(e) / 50))
             }
         }
+    }
+
+    /** Todas las teclas de la base de datos se pueden emitir. */
+    @Test
+    fun todaLaBaseDeDatosEsValida() {
+        val dir = File("src/main/assets/db")
+        val files = dir.listFiles { f -> f.extension == "json" }!!
+        assertTrue(files.size >= 7)
+        var count = 0
+        for (f in files) {
+            for (brand in CodeDatabase.parse(f.readText())) {
+                assertTrue(brand.remotes.isNotEmpty())
+                for (remote in brand.remotes) for (s in remote.signals) {
+                    val p = s.toIr(false).pattern
+                    assertTrue("${f.name} ${brand.name} ${s.label} vacío", p.isNotEmpty())
+                    assertTrue("${f.name} ${brand.name} ${s.label} tramos <= 0", p.all { it > 0 })
+                    assertTrue("${f.name} ${brand.name} ${s.label} > 2 s", p.sum() < 2_000_000)
+                    count++
+                }
+            }
+        }
+        assertTrue(count > 10000)
     }
 }

@@ -1,66 +1,68 @@
 # Mando Universal (Android)
 
-App de mando universal por infrarrojos para televisiones, pensada para configurar teles
-(por ejemplo, ponerlas en modo tienda) sin sacar el mando original.
+App de mando universal por infrarrojos, al estilo del "Smart Remote" de Vivo: televisiones,
+aires acondicionados, TV box, proyectores, barras de sonido, ventiladores y más.
 
-Funciona en móviles Android **con emisor de infrarrojos** (casi todos los Xiaomi, Redmi y POCO,
-algunos Honor, Huawei y Vivo). Los Samsung actuales y los iPhone no lo tienen.
+Funciona en móviles Android **con emisor de infrarrojos** (Xiaomi, Redmi, POCO, Vivo y algunos
+Honor y Huawei). Los Samsung actuales y los iPhone no lo tienen.
 
-## Cómo abrirlo
+## Descargar el APK
 
-1. Instala **Android Studio** (versión reciente).
-2. *File → Open* y elige la carpeta `MandoUniversal`.
-3. Si Android Studio avisa de que falta el *Gradle wrapper*, acepta que lo genere
-   (o en la terminal de Android Studio: `gradle wrapper`).
-4. Conecta el móvil con la depuración USB activada y pulsa ▶ *Run*.
+**https://github.com/Lomaxx58/mando-universal/releases/download/ultima/MandoUniversal.apk**
 
-> El emulador no tiene emisor de infrarrojos: para probar de verdad hace falta un móvil real.
+Ábrelo desde el móvil Android, descárgalo e instálalo (acepta "instalar apps de origen desconocido").
+Cada vez que se sube un cambio a `main`, GitHub recompila la app y ese enlace pasa a dar la versión nueva.
 
-## Qué hace
+## Cómo se usa
 
-- **Elegir marca**: Samsung, LG, Sony, Philips (modernas y antiguas), Panasonic y TCL (Roku TV).
-  Cada juego de códigos tiene un botón *Probar* que envía el encendido para comprobar que la tele responde.
-- **Mando**: encendido, fuente, silencio, cruceta con OK, atrás, inicio, menú, salir,
-  volumen, canales y teclado numérico. Volumen, canales y flechas se repiten al mantener pulsado.
-- **Modo tienda**: pasos orientativos para cada marca, con un mini mando en la misma pantalla.
-  Sony tiene un botón especial que abre el modo tienda directamente; LG, uno de demo automática.
-- Recuerda la última marca usada.
+1. **Menú principal**: tus mandos guardados y los tipos de aparato.
+2. Elige el tipo y la **marca** (con buscador y las más comunes arriba).
+3. **Búsqueda del código**: pulsa el botón de encendido y di si el aparato ha respondido;
+   si no, pasa al siguiente código de la marca. Queda guardado en *Mis mandos*.
+4. **Mando**: flecha ← para elegir otra marca (y otra vez ← para volver al menú),
+   marca en el centro y **⋮** con:
+   - Modo tienda (solo TV), con los pasos por marca y un mini mando al lado
+   - Probar otro código
+   - Todos los botones del código
+   - Información de la tele / del mando (protocolo, frecuencia, teclas, Smart TV, etc.)
+   - Consejos, cambiar nombre y eliminar
+5. **Aire acondicionado**: si el código trae estados completos, se maneja con modo
+   (frío, calor, seco...) y temperatura; si no, con las teclas que traiga.
+
+## Base de datos
+
+Los códigos vienen de **Flipper-IRDB** (github.com/Lucaslhm/Flipper-IRDB, licencia CC0),
+convertidos con `tools/build_db.py` a `app/src/main/assets/db/*.json`:
+
+| Tipo | Marcas | Códigos |
+|---|---|---|
+| Televisión | 122 | 391 |
+| Aire acondicionado | 96 | 158 |
+| TV Box / Decodificador | 59 | 88 |
+| Proyector | 54 | 122 |
+| Barra de sonido / Audio | 99 | 261 |
+| Ventilador | 92 | 152 |
+| Purificador / Calefactor | 157 | 231 |
+
+Para actualizarla: `git clone https://github.com/Lucaslhm/Flipper-IRDB` y
+`python3 tools/build_db.py Flipper-IRDB app/src/main/assets/db`.
 
 ## Estructura
 
 ```
 app/src/main/java/com/marcos/mandouniversal/
 ├── MainActivity.kt          Navegación entre pantallas
-├── RemoteController.kt      Envía señales en segundo plano y guarda la marca
-├── ir/
-│   ├── IrCodec.kt           Protocolos IR (NEC, Sony, RC5, RC6, Panasonic, RCA)
-│   └── IrTransmitter.kt     Acceso al emisor del móvil (ConsumerIrManager)
-├── data/
-│   └── Brands.kt            Códigos de cada marca y pasos de modo tienda
+├── RemoteController.kt      Envía las teclas en segundo plano
+├── ir/IrCodec.kt            Protocolos (NEC, Samsung, Sony, RC5/RC6, Kaseikyo, RCA, Pioneer) y señales raw
+├── data/                    Base de datos, mandos guardados y guías de modo tienda
 └── ui/                      Pantallas (Compose)
 ```
 
-## Añadir una marca
+Los protocolos interpretan dirección y comando igual que el firmware de Flipper Zero, que es
+quien capturó los códigos. El test `IrCodecTest` compara las señales con las que genera el
+propio firmware de Flipper y comprueba que todas las teclas de la base de datos se pueden emitir.
 
-Los códigos vienen de la base de datos libre **IRDB** (github.com/probonopd/irdb), carpeta `codes/<Marca>/TV/`.
-Cada línea del CSV es `función,protocolo,dispositivo,subdispositivo,código`, que es justo lo que
-recibe `IrCommand`. Para añadir una marca, copia uno de los bloques de `Brands.kt`, cambia los
-números y añádela a la lista `all`. Si usa un protocolo nuevo, hay que añadir su codificador en `IrCodec.kt`.
+## Abrirlo en Android Studio
 
-## Pendiente / limitaciones
-
-- **Hisense** no está en IRDB; habría que capturar sus códigos con un receptor IR.
-- Los TCL con Google TV pueden usar códigos distintos a los de TCL Roku TV.
-- Las rutas de menú del modo tienda son orientativas y cambian según el año del modelo.
-- Soporte para emisores IR por USB-C (para móviles sin emisor) como siguiente paso.
-
-## Tests
-
-`app/src/test/.../IrCodecTest.kt` comprueba que todos los códigos generan señales válidas.
-Ejecútalos con clic derecho → *Run tests*.
-
-## Conseguir el APK sin instalar nada (GitHub)
-
-Cada vez que se sube un cambio a `main`, GitHub compila la app (pestaña *Actions*, unos 5 minutos)
-y publica **MandoUniversal.apk** en *Releases → Última versión*. Abre esa página desde el móvil
-Android, descarga el APK e instálalo (acepta "instalar apps de origen desconocido").
+*File → Open* → esta carpeta. Si avisa de que falta el *Gradle wrapper*, acepta que lo genere.
+El emulador no tiene infrarrojos: para probar de verdad hace falta un móvil real.
