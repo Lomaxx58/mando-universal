@@ -67,3 +67,30 @@ class IrCodecTest {
         assertTrue(count > 10000)
     }
 }
+
+class AcCodebookTest {
+    /** Todos los estados de todos los aires con mando completo se pueden emitir. */
+    @Test
+    fun todosLosEstadosSonValidos() {
+        val files = File("src/main/assets/db/acp").listFiles { f -> f.extension == "json" }!!
+        assertTrue(files.size >= 40)
+        for (f in files) {
+            val book = com.marcos.mandouniversal.data.AcProtocols.Codebook.parse(f.readText())
+            assertEquals("${f.name}: número de estados", 3 * 5 * 15 * 4 * 2, book.size)
+            for (i in 0 until book.size) {
+                val s = book.signal(i)
+                assertTrue("${f.name} $i vacío", s.pattern.isNotEmpty() && s.pattern.size % 2 == 1)
+                assertTrue("${f.name} $i tramos <= 0", s.pattern.all { it > 0 })
+                assertTrue("${f.name} $i > 2 s", s.pattern.sum() < 2_000_000)
+                assertTrue("${f.name} frecuencia", s.frequency in 30000..60000)
+            }
+        }
+    }
+
+    @Test
+    fun indiceDeEstado() {
+        val ac = com.marcos.mandouniversal.data.AcProtocols
+        assertEquals(0, ac.index(0, "COOL", 16, "AUTO", false))
+        assertEquals(1799, ac.index(2, "AUTO", 30, "HIGH", true))
+    }
+}

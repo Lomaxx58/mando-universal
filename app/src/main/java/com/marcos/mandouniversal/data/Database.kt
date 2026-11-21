@@ -28,25 +28,38 @@ class Signal(
     val address: Long = 0,
     val command: Long = 0,
     val frequency: Int = 0,
-    val timings: IntArray? = null
+    val timings: IntArray? = null,
+    val acFile: String? = null,
+    val acIndex: Int = 0
 ) {
     val isRaw get() = protocol == "RAW"
 
-    fun toIr(toggle: Boolean): IrSignal =
-        if (isRaw) IrSignal(frequency, timings!!)
-        else IrCodec.encode(protocol, address, command, toggle)
+    fun toIr(toggle: Boolean): IrSignal = when {
+        isRaw -> IrSignal(frequency, timings!!)
+        protocol == "ACP" -> AcProtocols.codebook(acFile!!).signal(acIndex)
+        else -> IrCodec.encode(protocol, address, command, toggle)
+    }
 
     /** Frecuencia de portadora con la que sale esta tecla. */
     val carrier: Int
         get() = when {
-            isRaw -> frequency
+            isRaw || protocol == "ACP" -> frequency
             protocol.startsWith("SIRC") || protocol == "Pioneer" -> 40000
             protocol.startsWith("RC") && protocol != "RCA" -> 36000
             else -> 38000
         }
 }
 
-class RemoteDef(val model: String, val signals: List<Signal>) {
+/**
+ * Un código de mando. [model] es su identificador estable (se guarda en Mis mandos);
+ * [title] es lo que se enseña. Si [acProtocol] no es nulo es un "mando completo" de aire.
+ */
+class RemoteDef(
+    val model: String,
+    val signals: List<Signal>,
+    val title: String = model,
+    val acProtocol: AcProtocols.Info? = null
+) {
     private val byKey: Map<String, Signal> = signals.filter { it.key.isNotEmpty() }.associateBy { it.key }
 
     operator fun get(key: String): Signal? = byKey[key]
@@ -54,7 +67,8 @@ class RemoteDef(val model: String, val signals: List<Signal>) {
 
     /** La tecla con la que se prueba si el código funciona. */
     val testSignal: Signal
-        get() = this["POWER"] ?: this["POWER_OFF"] ?: this["POWER_ON"] ?: this["VOL_UP"]
+        get() = acProtocol?.let { AcProtocols.testSignal(it) }
+            ?: this["POWER"] ?: this["POWER_OFF"] ?: this["POWER_ON"] ?: this["VOL_UP"]
             ?: this["MUTE"] ?: signals.first()
 
     /** Estados completos de aire acondicionado capturados (p. ej. COOL_23). */
@@ -92,7 +106,26 @@ object CodeDatabase {
 
     private fun load(context: Context, category: Category): List<Brand> {
         val text = context.assets.open("db/${category.file}.json").bufferedReader().use { it.readText() }
-        return parse(text)
+        val brands = parse(text)
+        return if (category == Category.AC) withFullAcRemotes(context, brands) else brands
+    }
+
+    /** Añade delante los "mandos completos" de aire de cada marca (y las marcas que solo tienen esos). */
+    private fun withFullAcRemotes(context: Context, brands: List<Brand>): List<Brand> {
+        AcProtocols.init(context)
+        val map = AcProtocols.brands()
+        val byName = brands.associateBy { it.name.lowercase() }.toMutableMap()
+        val result = LinkedHashMap<String, Brand>()
+        brands.forEach { result[it.name.lowercase()] = it }
+        for ((brandName, ids) in map) {
+            val key = brandName.lowercase()
+            val full = ids.mapNotNull { AcProtocols.info(it) }.map { info ->
+                RemoteDef("acp:${info.id}", emptyList(), "Mando completo · ${info.label}", info)
+            }
+            val old = byName[key]
+            result[key] = Brand(brandName, full + (old?.remotes ?: emptyList()))
+        }
+        return result.values.sortedBy { it.name.lowercase() }
     }
 
     /** Público para poder probarlo sin Android. */

@@ -19,6 +19,8 @@ class RemoteController(val context: Context) {
 
     val saved = SavedRemotesStore(context)
 
+    init { com.marcos.mandouniversal.data.AcProtocols.init(context) }
+
     /** Bit "toggle" de RC5/RC6: cambia en cada pulsación nueva, no al mantener. */
     private var toggle = false
 

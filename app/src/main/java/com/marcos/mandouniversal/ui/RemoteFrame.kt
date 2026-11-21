@@ -88,8 +88,10 @@ fun RemoteFrame(
                     MenuItem("🏪  Modo tienda") { menuOpen = false; actions.onStoreMode() }
                 }
                 MenuItem("🔄  Probar otro código") { menuOpen = false; actions.onTryOther() }
-                MenuItem(if (showAll) "🎛️  Volver al mando" else "🔢  Todos los botones (${remote.signals.size})") {
-                    menuOpen = false; showAll = !showAll
+                if (remote.signals.isNotEmpty()) {
+                    MenuItem(if (showAll) "🎛️  Volver al mando" else "🔢  Todos los botones (${remote.signals.size})") {
+                        menuOpen = false; showAll = !showAll
+                    }
                 }
                 MenuItem(if (isTv) "ℹ️  Información de la tele" else "ℹ️  Información del mando") {
                     menuOpen = false; dialog = "info"
@@ -175,8 +177,11 @@ private fun InfoDialog(
     remote: RemoteDef,
     onDismiss: () -> Unit
 ) {
-    val protocols = remote.signals.map { if (it.isRaw) "Señal capturada (raw)" else it.protocol }.distinct()
-    val carriers = remote.signals.map { it.carrier }.distinct().sorted().joinToString(", ") { "${it / 1000} kHz" }
+    val ac = remote.acProtocol
+    val protocols = if (ac != null) listOf("${ac.label} (estado completo)")
+        else remote.signals.map { if (it.isRaw) "Señal capturada (raw)" else it.protocol }.distinct()
+    val carriers = (if (ac != null) listOf(ac.frequency) else remote.signals.map { it.carrier })
+        .distinct().sorted().joinToString(", ") { if (it % 1000 == 0) "${it / 1000} kHz" else "${it / 1000},${it % 1000 / 100} kHz" }
     val position = brand.remotes.indexOf(remote) + 1
     val labels = remote.signals.map { it.label.lowercase() }
     fun hasAny(vararg w: String) = labels.any { l -> w.any { l.contains(it) } }
@@ -198,6 +203,14 @@ private fun InfoDialog(
             if (hasAny("bluetooth", "bt")) add("Bluetooth")
             if (hasAny("picture", "p_mode", "p.mode", "pic")) add("Botón de modo de imagen")
         }
+        if (ac != null) {
+            val names = mapOf("COOL" to "frío", "HEAT" to "calor", "DRY" to "seco", "FAN" to "ventilar", "AUTO" to "auto")
+            add("Mando completo: la app guarda modo, grados y ventilador y los envía en cada pulsación")
+            add("Modos: ${ac.modes.joinToString(", ") { names[it] ?: it }}")
+            ac.temps.values.filterNotNull().firstOrNull()?.let { add("Temperatura: ${it.first}–${it.last} °C") }
+            add("Ventilador: ${ac.fans.size} velocidades" + if (ac.swing) " · con oscilación" else "")
+            add("Señales generadas con la librería IRremoteESP8266")
+        }
         if (remote.acStates.isNotEmpty()) {
             val temps = remote.acStates.values.flatMap { it.keys }
             add("Temperaturas guardadas: ${temps.min()}–${temps.max()} °C")
@@ -210,9 +223,9 @@ private fun InfoDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 InfoRow("Marca", brand.name)
-                InfoRow("Modelo de mando", remote.model)
+                InfoRow("Mando", remote.title)
                 InfoRow("Código", "$position de ${brand.remotes.size} de la marca")
-                InfoRow("Teclas", "${remote.signals.size}")
+                if (ac == null) InfoRow("Teclas", "${remote.signals.size}")
                 InfoRow("Protocolo", protocols.joinToString(", "))
                 InfoRow("Frecuencia", carriers)
                 InfoRow("Emisor del móvil", if (controller.hasIrEmitter) controller.emitterRanges else "no tiene")

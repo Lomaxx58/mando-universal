@@ -157,7 +157,7 @@ private fun RemoteScreen(
             onDelete = { store.delete(saved.id); onChanged(); onNavigate(Screen.Home) }
         )
         RemoteFrame(controller, saved, brand, remote, actions) {
-            if (saved.category == Category.AC) AcRemote(controller, remote)
+            if (saved.category == Category.AC) AcRemote(controller, remote, saved.id, brand.remotes.any { it.acProtocol != null })
             else StandardRemote(controller, remote)
         }
     }

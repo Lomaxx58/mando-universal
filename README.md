@@ -26,8 +26,10 @@ Cada vez que se sube un cambio a `main`, GitHub recompila la app y ese enlace pa
    - Todos los botones del código
    - Información de la tele / del mando (protocolo, frecuencia, teclas, Smart TV, etc.)
    - Consejos, cambiar nombre y eliminar
-5. **Aire acondicionado**: si el código trae estados completos, se maneja con modo
-   (frío, calor, seco...) y temperatura; si no, con las teclas que traiga.
+5. **Aire acondicionado**: los **mandos completos** (los primeros que se prueban en cada marca)
+   guardan el estado y lo enseñan en pantalla: encendido, modo, grados, ventilador y oscilación.
+   Cada pulsación envía la orden entera, igual que el mando original, así que el aire queda
+   como indica la pantalla. Los demás códigos son de teclas sueltas.
 
 ## Base de datos
 
@@ -44,7 +46,13 @@ convertidos con `tools/build_db.py` a `app/src/main/assets/db/*.json`:
 | Ventilador | 92 | 152 |
 | Purificador / Calefactor | 157 | 231 |
 
-Para actualizarla: `git clone https://github.com/Lucaslhm/Flipper-IRDB` y
+Los **mandos completos de aire** (57 protocolos de 66 marcas: Daikin, Mitsubishi, Fujitsu, LG,
+Samsung, Panasonic, Gree, Midea, Haier, Hisense, Toshiba...) se generan con la librería
+[IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) (LGPL-2.1): `tools/acgen/gen.cpp`
+calcula la señal exacta de cada combinación de encendido, modo, grados, ventilador y oscilación, y
+`tools/acgen/package.py` las guarda en `assets/db/acp` junto con las capacidades de cada protocolo.
+
+Para actualizar la base de datos de teclas: `git clone https://github.com/Lucaslhm/Flipper-IRDB` y
 `python3 tools/build_db.py Flipper-IRDB app/src/main/assets/db`.
 
 ## Estructura

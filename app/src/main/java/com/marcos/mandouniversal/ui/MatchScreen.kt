@@ -76,6 +76,10 @@ fun MatchScreen(
 
         Text("Código ${index + 1} de $total", color = TextDim, fontSize = 14.sp,
             modifier = Modifier.padding(top = 12.dp))
+        if (remote.acProtocol != null) {
+            Text("Mando completo · muestra grados y modo", color = Accent, fontSize = 13.sp,
+                modifier = Modifier.padding(top = 2.dp))
+        }
         LinearProgressIndicator(
             progress = { (index + 1f) / total },
             color = Accent, trackColor = Surface2,
@@ -109,7 +113,11 @@ fun MatchScreen(
             }
         }
         Text(
-            if (isPower) "Tecla de encendido" else "Tecla: ${prettyLabel(test.label)}",
+            when {
+                remote.acProtocol != null -> "Debería encenderse en frío a 24 °C"
+                isPower -> "Tecla de encendido"
+                else -> "Tecla: ${prettyLabel(test.label)}"
+            },
             color = TextDim, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp)
         )
 
@@ -162,8 +170,8 @@ fun MatchScreen(
                             .clickable { index = i; tried = false }
                             .padding(14.dp)
                     ) {
-                        Text("${i + 1}. ${r.model}", color = TextMain, modifier = Modifier.weight(1f))
-                        Text("${r.signals.size} teclas", color = TextDim, fontSize = 13.sp)
+                        Text("${i + 1}. ${r.title}", color = TextMain, modifier = Modifier.weight(1f))
+                        Text(if (r.acProtocol != null) "Completo" else "${r.signals.size} teclas", color = TextDim, fontSize = 13.sp)
                     }
                 }
             }

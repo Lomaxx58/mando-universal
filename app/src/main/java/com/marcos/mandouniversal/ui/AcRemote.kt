@@ -41,7 +41,25 @@ private val modeNames = linkedMapOf(
  * mando de verdad; si no, con las teclas que traiga (temp +/-, modo, ventilador...).
  */
 @Composable
-fun ColumnScope.AcRemote(controller: RemoteController, remote: RemoteDef) {
+fun ColumnScope.AcRemote(controller: RemoteController, remote: RemoteDef, savedId: String, fullAvailable: Boolean) {
+    val proto = remote.acProtocol
+    if (proto != null) {
+        FullAcRemote(controller, proto, savedId)
+        return
+    }
+    if (fullAvailable && remote.acStates.isEmpty()) {
+        Text(
+            "Este código solo tiene teclas sueltas, así que el móvil no puede saber los grados ni el modo. " +
+                "Para verlos en pantalla usa un \"Mando completo\": ⋮ → Probar otro código.",
+            color = Color.Black, fontSize = 13.sp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp, bottom = 8.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Accent)
+                .padding(12.dp)
+        )
+    }
     val placed = HashSet<String>()
     fun k(key: String): Signal? = remote[key]?.also { placed += key }
     val states = remote.acStates
