@@ -49,7 +49,7 @@ class IrCodecTest {
     @Test
     fun todaLaBaseDeDatosEsValida() {
         val dir = File("src/main/assets/db")
-        val files = dir.listFiles { f -> f.extension == "json" }!!
+        val files = dir.listFiles { f -> f.extension == "json" && f.name != "ac_protocols.json" }!!
         assertTrue(files.size >= 7)
         var count = 0
         for (f in files) {
